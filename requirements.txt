@@ -1,0 +1,24 @@
+# Attendance Agent POC — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Web framework ────────────────────────────────────────────────────────────
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+
+# ── Database ─────────────────────────────────────────────────────────────────
+supabase>=2.0.0
+python-dotenv>=1.0.0
+
+# ── LangGraph (agent orchestration) ─────────────────────────────────────────
+langgraph>=0.1.0
+langchain-core>=0.2.0
+# SQLite checkpoint persistence is distributed separately from LangGraph.
+langgraph-checkpoint-sqlite>=2.0.0
+
+# ── Pydantic ─────────────────────────────────────────────────────────────────
+pydantic>=2.0.0
+
+# ── Gemini (Node 5 LLM — OPTIONAL) ───────────────────────────────────────────
+# If not installed, Node 5 uses a rule-based fallback narrative instead.
+# Uncomment the line below to enable Gemini:
+# google-generativeai>=0.7.0

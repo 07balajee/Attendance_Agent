@@ -1,0 +1,12 @@
+# Local secrets and environment files
+.env
+
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Runtime checkpoint state
+checkpointer/agent_state.db
+checkpointer/states/

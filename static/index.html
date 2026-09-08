@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Attendance Agent POC — OxiqAI HRMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/lucide@0.469.0"></script>
+<style>
+:root {
+  --primary:#2563eb; --accent2:#7c3aed; --green:#059669;
+  --orange:#d97706;  --red:#e11d48;     --border:#c3c6d7;
+  --card:#ffffff;    --bg:#faf8ff;      --text:#131b2e;
+  --muted:#5a6478;   --surface:#f1f0f9;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+h1,h2,h3,h4{font-family:'Geist','Inter',sans-serif;}
+
+/* ── Top bar ── */
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 32px;
+  height:60px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;}
+.topbar-title{display:flex;align-items:center;gap:10px;font-family:'Geist',sans-serif;
+  font-weight:700;font-size:1.1rem;color:var(--text);}
+.topbar-title .badge{background:var(--accent2);color:#fff;font-size:0.65rem;
+  font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.5px;}
+.topbar-meta{font-size:0.8rem;color:var(--muted);}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:340px 1fr;gap:24px;
+  padding:28px 32px;max-width:1400px;margin:0 auto;}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:24px;box-shadow:0 1px 3px rgba(19,27,46,.06);}
+.card-title{font-size:.75rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;}
+
+/* ── Employee selector ── */
+.emp-select{width:100%;padding:10px 14px;border:1px solid var(--border);
+  border-radius:12px;font-family:'Inter',sans-serif;font-size:.875rem;
+  background:#fff;color:var(--text);cursor:pointer;outline:none;}
+.emp-select:focus{border-color:var(--primary);}
+
+.emp-info{margin-top:16px;padding:14px;background:var(--surface);
+  border-radius:12px;display:none;}
+.emp-info.show{display:block;}
+.emp-info-row{display:flex;justify-content:space-between;margin-bottom:6px;
+  font-size:.8rem;}
+.emp-info-row .label{color:var(--muted);}
+.emp-info-row .val{font-weight:500;}
+
+/* ── Config panel ── */
+.config-row{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;}
+.config-row label{font-size:.85rem;color:var(--text);}
+.toggle{position:relative;width:44px;height:24px;display:inline-block;}
+.toggle input{opacity:0;width:0;height:0;}
+.slider{position:absolute;inset:0;background:#ccc;border-radius:24px;
+  transition:.3s;cursor:pointer;}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;
+  bottom:3px;background:white;border-radius:50%;transition:.3s;}
+input:checked+.slider{background:var(--primary);}
+input:checked+.slider:before{transform:translateX(20px);}
+
+.run-btn{width:100%;padding:13px;background:var(--primary);color:#fff;
+  border:none;border-radius:12px;font-family:'Geist',sans-serif;font-weight:600;
+  font-size:.95rem;cursor:pointer;transition:background .2s;
+  display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;}
+.run-btn:hover{background:#1d4ed8;}
+.run-btn:disabled{background:#94a3b8;cursor:not-allowed;}
+
+/* ── Right panel tabs ── */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);
+  margin-bottom:20px;}
+.tab{padding:8px 18px;border-radius:10px 10px 0 0;font-size:.85rem;
+  font-weight:500;cursor:pointer;color:var(--muted);border:none;
+  background:transparent;transition:all .2s;}
+.tab.active{background:var(--primary);color:#fff;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ── Node status row ── */
+.node-row{display:flex;align-items:flex-start;gap:12px;
+  padding:14px 0;border-bottom:1px solid var(--surface);}
+.node-row:last-child{border-bottom:none;}
+.node-icon{width:36px;height:36px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;flex-shrink:0;font-weight:700;
+  font-size:.8rem;font-family:'Geist',sans-serif;}
+.node-icon.idle{background:var(--surface);color:var(--muted);}
+.node-icon.running{background:#dbeafe;color:var(--primary);animation:pulse 1s infinite;}
+.node-icon.done{background:#dcfce7;color:var(--green);}
+.node-icon.warn{background:#fef3c7;color:var(--orange);}
+.node-icon.hil{background:#fce7f3;color:#db2777;animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+.node-body{flex:1;}
+.node-name{font-weight:600;font-size:.875rem;margin-bottom:4px;}
+.node-status{font-size:.78rem;color:var(--muted);}
+.node-actions-count{font-size:.75rem;font-weight:600;color:var(--green);
+  background:#dcfce7;padding:2px 8px;border-radius:20px;margin-left:8px;}
+.node-actions-count.warn{color:var(--orange);background:#fef3c7;}
+
+/* ── Log console ── */
+.log-console{background:#0f172a;border-radius:12px;padding:18px;
+  font-family:'Courier New',monospace;font-size:.78rem;color:#94a3b8;
+  min-height:240px;max-height:420px;overflow-y:auto;line-height:1.6;}
+.log-line{margin:1px 0;}
+.log-line.info{color:#94a3b8;}
+.log-line.action{color:#4ade80;}
+.log-line.warn{color:#fbbf24;}
+.log-line.error{color:#f87171;}
+.log-line.head{color:#60a5fa;font-weight:bold;}
+.log-line.hil{color:#f472b6;}
+
+/* ── Actions table ── */
+.actions-table{width:100%;border-collapse:collapse;font-size:.82rem;}
+.actions-table th{text-align:left;padding:8px 12px;background:var(--surface);
+  color:var(--muted);font-weight:600;font-size:.73rem;text-transform:uppercase;
+  letter-spacing:.5px;}
+.actions-table td{padding:8px 12px;border-top:1px solid var(--border);}
+.badge-action{padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;}
+.badge-action.insert{background:#dcfce7;color:#16a34a;}
+.badge-action.patch{background:#dbeafe;color:#1d4ed8;}
+.badge-action.warn{background:#fef3c7;color:#b45309;}
+.badge-action.breach{background:#fee2e2;color:#b91c1c;}
+.badge-action.dry{background:#f1f5f9;color:#64748b;}
+
+/* ── HIL Review Panel ── */
+.hil-panel{display:none;background:#fff;border:2px solid #db2777;
+  border-radius:16px;padding:24px;margin-top:20px;}
+.hil-panel.show{display:block;}
+.hil-title{color:#db2777;font-weight:700;font-size:1rem;
+  display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+.hil-flags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.flag-badge{padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:600;
+  background:#fce7f3;color:#be185d;}
+.hil-narrative{width:100%;min-height:120px;padding:14px;
+  border:1px solid var(--border);border-radius:12px;
+  font-family:'Inter',sans-serif;font-size:.875rem;resize:vertical;
+  margin-bottom:16px;line-height:1.6;}
+.hil-narrative:focus{outline:none;border-color:#db2777;}
+.hil-actions{display:flex;gap:12px;}
+.btn-approve{padding:10px 24px;background:#16a34a;color:#fff;border:none;
+  border-radius:12px;font-weight:600;font-size:.875rem;cursor:pointer;
+  font-family:'Geist',sans-serif;}
+.btn-reject{padding:10px 24px;background:#fff;color:#dc2626;
+  border:1px solid #dc2626;border-radius:12px;font-weight:600;
+  font-size:.875rem;cursor:pointer;font-family:'Geist',sans-serif;}
+
+/* ── Stats row ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+  margin-bottom:20px;}
+.stat-card{background:var(--surface);border-radius:12px;padding:14px 16px;
+  text-align:center;}
+.stat-val{font-size:1.6rem;font-weight:700;font-family:'Geist',sans-serif;}
+.stat-label{font-size:.73rem;color:var(--muted);margin-top:2px;}
+.stat-val.green{color:var(--green);}
+.stat-val.orange{color:var(--orange);}
+.stat-val.red{color:var(--red);}
+.stat-val.blue{color:var(--primary);}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:48px 24px;color:var(--muted);}
+.empty-icon{font-size:2.5rem;margin-bottom:12px;opacity:.3;}
+
+/* ── Spinner ── */
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#131b2e;color:#fff;
+  padding:12px 20px;border-radius:12px;font-size:.85rem;z-index:999;
+  opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-title">
+    <i data-lucide="bot" style="color:var(--primary);width:22px;height:22px;"></i>
+    Attendance Agent POC
+    <span class="badge">DEMO</span>
+  </div>
+  <div class="topbar-meta" id="config-status">Loading...</div>
+</div>
+
+<div class="layout">
+
+  <!-- ── Left panel ── -->
+  <div>
+
+    <!-- Employee selector -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">Select Employee</div>
+      <select class="emp-select" id="emp-select" onchange="onEmpChange()">
+        <option value="">— Loading employees... —</option>
+      </select>
+      <div class="emp-info" id="emp-info">
+        <div class="emp-info-row">
+          <span class="label">Employee ID</span>
+          <span class="val" id="ei-id">—</span>
+        </div>
+        <div class="emp-info-row">
+          <span class="label">Department</span>
+          <span class="val" id="ei-dept">—</span>
+        </div>
+        <div class="emp-info-row">
+          <span class="label">Level</span>
+          <span class="val" id="ei-level">—</span>
+        </div>
+        <div class="emp-info-row">
+          <span class="label">Role</span>
+          <span class="val" id="ei-role">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Run config -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">Pipeline Config</div>
+      <div class="config-row">
+        <label>Dry Run (no DB writes)</label>
+        <label class="toggle">
+          <input type="checkbox" id="dry-run-toggle" checked/>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="config-row">
+        <label>Run Date</label>
+        <input type="date" id="run-date" style="padding:6px 10px;border:1px solid var(--border);
+          border-radius:8px;font-family:'Inter',sans-serif;font-size:.82rem;"/>
+      </div>
+      <button class="run-btn" id="run-btn" onclick="runPipeline()" disabled>
+        <i data-lucide="play" style="width:16px;height:16px;"></i>
+        Run Agent Pipeline
+      </button>
+    </div>
+
+    <!-- Node status -->
+    <div class="card">
+      <div class="card-title">Node Status</div>
+      <div id="node-status-list">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Right panel ── -->
+  <div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="stats-row" style="display:none;">
+      <div class="stat-card">
+        <div class="stat-val green" id="stat-actions">0</div>
+        <div class="stat-label">Total Actions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val orange" id="stat-escalations">0</div>
+        <div class="stat-label">Escalations</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val blue" id="stat-flags">0</div>
+        <div class="stat-label">Anomaly Flags</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-hil" style="color:var(--accent2);">—</div>
+        <div class="stat-label">HIL Required</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('logs')">Live Logs</button>
+        <button class="tab" onclick="switchTab('actions')">Actions Taken</button>
+        <button class="tab" onclick="switchTab('hil')">HIL Review</button>
+      </div>
+
+      <!-- Logs tab -->
+      <div class="tab-panel active" id="tab-logs">
+        <div class="log-console" id="log-console">
+          <div class="log-line info">Ready. Select an employee and click Run.</div>
+        </div>
+      </div>
+
+      <!-- Actions tab -->
+      <div class="tab-panel" id="tab-actions">
+        <div id="actions-container">
+          <div class="empty">
+            <div class="empty-icon">📋</div>
+            <p>No actions yet. Run the pipeline first.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- HIL tab -->
+      <div class="tab-panel" id="tab-hil">
+        <div id="hil-empty" class="empty">
+          <div class="empty-icon">🤖</div>
+          <p>No HIL review pending.</p>
+          <p style="font-size:.8rem;margin-top:8px;">
+            Node 5 will pause here when anomaly flags are detected.
+          </p>
+        </div>
+        <div class="hil-panel" id="hil-panel">
+          <div class="hil-title">
+            <i data-lucide="shield-alert" style="width:18px;height:18px;"></i>
+            HR Review Required — Node 5 Paused
+          </div>
+          <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px;">
+            Anomaly flags detected for <strong id="hil-emp-name">—</strong>.
+            Review the AI-drafted narrative below, edit if needed, then approve or reject.
+          </p>
+          <div class="hil-flags" id="hil-flags-list"></div>
+          <p style="font-size:.78rem;color:var(--muted);margin-bottom:8px;font-weight:600;">
+            DRAFT NARRATIVE (edit before approving)
+          </p>
+          <textarea class="hil-narrative" id="hil-narrative-text"></textarea>
+          <div class="hil-actions">
+            <button class="btn-approve" onclick="approveHIL()">
+              ✓ Approve & Save to DB
+            </button>
+            <button class="btn-reject" onclick="rejectHIL()">
+              ✗ Reject — Discard
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let employees = [];
+let selectedEmp = null;
+let isRunning = false;
+let allActions = [];
+let totalActions = 0;
+let totalEscalations = 0;
+let hilData = null;
+
+const NODES = [
+  { id: "node1", label: "Node 1 — Absence Marking",         icon: "1" },
+  { id: "node2", label: "Node 2 — Leave Balance",           icon: "2" },
+  { id: "node3", label: "Node 3 — Overtime Sync",           icon: "3" },
+  { id: "node4", label: "Node 4 — Escalation",              icon: "4" },
+  { id: "node5", label: "Node 5 — Anomaly & Narrative",     icon: "5" },
+];
+let nodeState = {};
+NODES.forEach(n => nodeState[n.id] = "idle");
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  // Set today's date
+  document.getElementById("run-date").value = new Date().toISOString().slice(0,10);
+  renderNodeStatus();
+  await loadHealth();
+  await loadEmployees();
+  lucide.createIcons();
+});
+
+async function loadHealth() {
+  try {
+    const r = await fetch("/health");
+    const d = await r.json();
+    const el = document.getElementById("config-status");
+    const parts = [];
+    parts.push(d.supabase_configured ? "✓ Supabase" : "✗ Supabase (check .env)");
+    parts.push(d.gemini_configured ? "✓ Gemini" : "⚠ Gemini (fallback narrative)");
+    parts.push(d.dry_run ? "DRY RUN ON" : "LIVE MODE");
+    el.textContent = parts.join("  |  ");
+    el.style.color = d.supabase_configured ? "var(--green)" : "var(--red)";
+  } catch(e) {
+    document.getElementById("config-status").textContent = "Server not reachable";
+  }
+}
+
+async function loadEmployees() {
+  try {
+    const r = await fetch("/api/employees");
+    employees = await r.json();
+    const sel = document.getElementById("emp-select");
+    sel.innerHTML = '<option value="">— Select an employee —</option>';
+    employees.forEach(e => {
+      const opt = document.createElement("option");
+      opt.value = e.id;
+      opt.textContent = `${e.name} (${e.department || "—"})`;
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    log("error", "Failed to load employees: " + e.message);
+  }
+}
+
+function onEmpChange() {
+  const id = document.getElementById("emp-select").value;
+  selectedEmp = employees.find(e => e.id === id) || null;
+  const info = document.getElementById("emp-info");
+  if (selectedEmp) {
+    info.classList.add("show");
+    document.getElementById("ei-id").textContent = selectedEmp.id;
+    document.getElementById("ei-dept").textContent = selectedEmp.department || "—";
+    document.getElementById("ei-level").textContent = selectedEmp.level || "—";
+    document.getElementById("ei-role").textContent = selectedEmp.role || "—";
+    document.getElementById("run-btn").disabled = false;
+  } else {
+    info.classList.remove("show");
+    document.getElementById("run-btn").disabled = true;
+  }
+}
+
+// ── Run pipeline ─────────────────────────────────────────────────────────────
+async function runPipeline() {
+  if (!selectedEmp || isRunning) return;
+  isRunning = true;
+  allActions = [];
+  totalActions = 0;
+  totalEscalations = 0;
+  hilData = null;
+
+  // Reset UI
+  clearLog();
+  renderNodeStatus("idle");
+  document.getElementById("actions-container").innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>Running...</p></div>';
+  document.getElementById("hil-panel").classList.remove("show");
+  document.getElementById("hil-empty").style.display = "block";
+  document.getElementById("stats-row").style.display = "none";
+
+  const btn = document.getElementById("run-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Running...';
+
+  const dryRun = document.getElementById("dry-run-toggle").checked;
+  const runDate = document.getElementById("run-date").value;
+
+  try {
+    const resp = await fetch(`/api/run/${selectedEmp.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dry_run: dryRun, run_date: runDate }),
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (line.trim()) processStreamLine(JSON.parse(line));
+      }
+    }
+    if (buf.trim()) processStreamLine(JSON.parse(buf));
+
+  } catch(e) {
+    log("error", "Pipeline error: " + e.message);
+  }
+
+  // Update stats
+  document.getElementById("stats-row").style.display = "grid";
+  document.getElementById("stat-actions").textContent = totalActions;
+  document.getElementById("stat-escalations").textContent = totalEscalations;
+
+  isRunning = false;
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="play" style="width:16px;height:16px;"></i> Run Agent Pipeline';
+  lucide.createIcons();
+  renderActionsTable();
+}
+
+function processStreamLine(evt) {
+  const { node, logs, actions, hil_required, flags, draft_narrative,
+          employee_name, employee_id, run_date } = evt;
+
+  // Log lines
+  (logs || []).forEach(l => {
+    let cls = "info";
+    if (l.includes("✓")) cls = "action";
+    else if (l.includes("SLA") || l.includes("⚠")) cls = "warn";
+    else if (l.includes("Node")) cls = "head";
+    else if (l.includes("HIL") || l.includes("⏸")) cls = "hil";
+    log(cls, l);
+  });
+
+  // Actions
+  (actions || []).forEach(a => {
+    allActions.push(a);
+    totalActions++;
+    if ((a.action || "").includes("SLA") || (a.action || []).includes?.("SLA_BREACHED")) {
+      totalEscalations++;
+    }
+  });
+
+  // Node state updates
+  if (node === "NODE1_START") setNodeState("node1", "running");
+  if (node === "NODE1_DONE")  setNodeState("node1", actions?.length ? "warn" : "done", actions?.length);
+  if (node === "NODE2_START") setNodeState("node2", "running");
+  if (node === "NODE2_DONE")  setNodeState("node2", actions?.length ? "warn" : "done", actions?.length);
+  if (node === "NODE3_START") setNodeState("node3", "running");
+  if (node === "NODE3_DONE")  setNodeState("node3", actions?.length ? "warn" : "done", actions?.length);
+  if (node === "NODE4_START") setNodeState("node4", "running");
+  if (node === "NODE4_DONE")  setNodeState("node4", actions?.length ? "warn" : "done", actions?.length);
+  if (node === "NODE5_START") setNodeState("node5", "running");
+
+  if (node === "NODE5_HIL_PAUSE") {
+    setNodeState("node5", "hil", 0);
+    hilData = { employee_id, employee_name, run_date, flags, draft_narrative };
+    document.getElementById("stat-flags").textContent = Object.keys(flags || {}).length;
+    document.getElementById("stat-hil").textContent = "YES";
+    showHIL(hilData);
+    switchTab("hil");
+  }
+
+  if (node === "NODE5_DONE") {
+    setNodeState("node5", "done", 0);
+    document.getElementById("stat-flags").textContent = "0";
+    document.getElementById("stat-hil").textContent = "No";
+  }
+
+  if (node === "PIPELINE_COMPLETE") {
+    log("action", "─────────────────────────────────────────");
+  }
+}
+
+// ── Node status rendering ─────────────────────────────────────────────────────
+function renderNodeStatus() {
+  const container = document.getElementById("node-status-list");
+  container.innerHTML = NODES.map(n => {
+    const st = nodeState[n.id] || "idle";
+    return `
+    <div class="node-row" id="nr-${n.id}">
+      <div class="node-icon ${st}" id="ni-${n.id}">${n.icon}</div>
+      <div class="node-body">
+        <div class="node-name">${n.label}</div>
+        <div class="node-status" id="ns-${n.id}">${statusLabel(st)}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function setNodeState(nodeId, state, actionCount) {
+  nodeState[nodeId] = state;
+  const icon = document.getElementById(`ni-${nodeId}`);
+  const status = document.getElementById(`ns-${nodeId}`);
+  if (icon) icon.className = `node-icon ${state}`;
+  if (status) {
+    let txt = statusLabel(state);
+    if (actionCount > 0) txt += ` <span class="node-actions-count${state==='warn'?' warn':''}">${actionCount} action${actionCount>1?'s':''}</span>`;
+    status.innerHTML = txt;
+  }
+}
+
+function statusLabel(st) {
+  return { idle:"Waiting", running:"Running...", done:"Complete — no issues",
+           warn:"Complete — actions taken", hil:"⏸ Paused — HIL Review" }[st] || st;
+}
+
+// ── Log console ───────────────────────────────────────────────────────────────
+function log(cls, text) {
+  const c = document.getElementById("log-console");
+  const div = document.createElement("div");
+  div.className = `log-line ${cls}`;
+  div.textContent = text;
+  c.appendChild(div);
+  c.scrollTop = c.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById("log-console").innerHTML = "";
+}
+
+// ── Actions table ─────────────────────────────────────────────────────────────
+function renderActionsTable() {
+  const container = document.getElementById("actions-container");
+  if (!allActions.length) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>No actions taken — everything was already in order.</p></div>';
+    return;
+  }
+  const rows = allActions.map(a => {
+    const actionArr = Array.isArray(a.action) ? a.action : [a.action || "—"];
+    const badges = actionArr.map(act => {
+      let cls = "patch";
+      if ((act||"").includes("INSERT")) cls = "insert";
+      if ((act||"").includes("BREACH") || (act||"").includes("breach")) cls = "breach";
+      if ((act||"").includes("WARN") || (act||"").includes("warn")) cls = "warn";
+      if (a.result?._dry_run) cls = "dry";
+      return `<span class="badge-action ${cls}">${act}</span>`;
+    }).join(" ");
+    const id = a.record_id || a.request_id || a.item_id || a.ot_id || a.attendance_record_id || "—";
+    const dry = a.result?._dry_run ? " <span style='font-size:.7rem;color:var(--muted);'>(dry)</span>" : "";
+    return `<tr><td>${badges}${dry}</td><td style="font-family:monospace;font-size:.75rem;">${id}</td><td>${a.date||a.leave_type||a.table||"—"}</td></tr>`;
+  }).join("");
+  container.innerHTML = `
+    <table class="actions-table">
+      <thead><tr><th>Action</th><th>Record ID</th><th>Detail</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── HIL ───────────────────────────────────────────────────────────────────────
+function showHIL(data) {
+  document.getElementById("hil-empty").style.display = "none";
+  const panel = document.getElementById("hil-panel");
+  panel.classList.add("show");
+  document.getElementById("hil-emp-name").textContent = data.employee_name || data.employee_id;
+  document.getElementById("hil-narrative-text").value = data.draft_narrative || "";
+  const flagsEl = document.getElementById("hil-flags-list");
+  flagsEl.innerHTML = Object.keys(data.flags || {}).map(f =>
+    `<span class="flag-badge">${f.replace(/_/g," ")}</span>`
+  ).join("");
+  showToast("⏸ Node 5 paused — HR review required. Check HIL tab.");
+}
+
+async function approveHIL() {
+  if (!hilData) return;
+  const text = document.getElementById("hil-narrative-text").value.trim();
+  if (!text) { showToast("Please write a narrative before approving."); return; }
+
+  try {
+    const r = await fetch("/api/hil/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        employee_id: hilData.employee_id,
+        run_date: hilData.run_date,
+        approved_text: text,
+      }),
+    });
+    const d = await r.json();
+    log("action", "[HIL] ✓ Narrative approved and written to DB.");
+    (d.logs || []).forEach(l => log("action", l));
+    document.getElementById("hil-panel").classList.remove("show");
+    document.getElementById("hil-empty").style.display = "block";
+    setNodeState("node5", "done", 1);
+    document.getElementById("stat-hil").textContent = "Done ✓";
+    showToast("✓ Narrative approved and saved.");
+    switchTab("logs");
+    hilData = null;
+  } catch(e) {
+    showToast("Error approving: " + e.message);
+  }
+}
+
+async function rejectHIL() {
+  if (!hilData) return;
+  try {
+    await fetch("/api/hil/reject", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employee_id: hilData.employee_id, run_date: hilData.run_date }),
+    });
+    log("warn", "[HIL] Narrative rejected by HR — no DB write.");
+    document.getElementById("hil-panel").classList.remove("show");
+    document.getElementById("hil-empty").style.display = "block";
+    setNodeState("node5", "done", 0);
+    document.getElementById("stat-hil").textContent = "Rejected";
+    showToast("Narrative rejected — no changes saved.");
+    hilData = null;
+  } catch(e) {
+    showToast("Error rejecting: " + e.message);
+  }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((t,i) => {
+    const names = ["logs","actions","hil"];
+    t.classList.toggle("active", names[i] === name);
+  });
+  document.querySelectorAll(".tab-panel").forEach((p,i) => {
+    const names = ["logs","actions","hil"];
+    p.classList.toggle("active", names[i] === name);
+  });
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
+}
+</script>
+</body>
+</html>
